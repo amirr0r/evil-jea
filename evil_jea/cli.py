@@ -145,26 +145,49 @@ def run_command(wsman, command, raw):
             args = []
             params = []
             seen = False
+            known_switches = [
+                "UseDefaultCredentials",
+                "UseBasicParsing",
+                "Verbose",
+                "Debug",
+                "Force",
+                "Recurse",
+            ]
+
             if len(commands) > 1:
                 for cmd in commands[1:]:
                     if cmd.startswith("-"):
-                        params.append(cmd[1:])
-                        seen = True
-                        continue
+                        param_name = cmd.lstrip("-")
+                        if param_name in known_switches:
+                            params.append((param_name, True))  # switch param
+                            seen = False
+                        else:
+                            params.append(param_name)
+                            seen = True
                     else:
                         if seen:
                             params.append(cmd)
                             seen = False
                         else:
                             args.append(cmd)
+
                 ps.add_cmdlet(commands[0])
                 for arg in args:
                     ps.add_argument(arg)
-                for i in range(0, len(params), 2):
-                    try:
-                        ps.add_parameter(params[i], params[i + 1])
-                    except IndexError:
-                        print(f"[!] Missing value for parameter: {params[i]}")
+
+                # ✅ New logic: support (param, value) tuples for switches
+                i = 0
+                while i < len(params):
+                    if isinstance(params[i], tuple):
+                        ps.add_parameter(params[i][0], params[i][1])
+                        i += 1
+                    else:
+                        try:
+                            ps.add_parameter(params[i], params[i + 1])
+                            i += 2
+                        except IndexError:
+                            print(f"[!] Missing value for parameter: {params[i]}")
+                            i += 1
             else:
                 ps.add_cmdlet(command)
 
